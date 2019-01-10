@@ -39,3 +39,9 @@ go_repository(
     strip_prefix = "mux-1.6.2",
     urls = ["https://github.com/gorilla/mux/archive/v1.6.2.zip"],
 )
+
+go_repository(
+    name = "com_github_gorilla_context",
+    commit = "51ce91d2eaddeca0ef29a71d766bb3634dadf729",
+    importpath = "github.com/gorilla/context",
+)
