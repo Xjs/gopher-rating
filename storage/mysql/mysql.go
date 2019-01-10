@@ -3,7 +3,10 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+
+	"github.com/Xjs/gopher-rating/model"
 
 	_ "github.com/go-sql-driver/mysql" // MySQL driver is obviously needed
 )
@@ -47,4 +50,89 @@ func NewStorerWithCustomTables(ctx context.Context, dsn string, gopherTable, rat
 	}
 
 	return &Storer{db: db, gopherTable: gopherTable, ratingsTable: ratingsTable}, nil
+}
+
+// Save implements the storage.Interface
+func (s *Storer) Save(ctx context.Context, gopher *model.Gopher) error {
+	if _, err := s.db.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s VALUES (?, ?);", s.gopherTable), gopher.Hash, gopher.Raw); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Load implements the storage.Interface
+func (s *Storer) Load(ctx context.Context, hash model.Hash) (*model.Gopher, error) {
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf("SELECT (`hash`, `gopher`) FROM %s WHERE hash = ?", s.gopherTable), hash)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var gopher model.Gopher
+	for rows.Next() {
+		if err := rows.Scan(&gopher.Hash, &gopher.Raw); err != nil {
+			return nil, err
+		}
+		return &gopher, nil
+	}
+
+	return nil, nil
+}
+
+// List implements the storage.Interface
+func (s *Storer) List(ctx context.Context, start, count int) ([]model.Hash, error) {
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf("SELECT (`hash`) FROM %s ORDER BY `hash` LIMIT ?, ?", s.gopherTable), start, count)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var hashes []model.Hash
+	for rows.Next() {
+		var h model.Hash
+		if err := rows.Scan(&h); err != nil {
+			return nil, err
+		}
+		hashes = append(hashes, h)
+	}
+
+	return hashes, nil
+}
+
+// Count implements the storage.Interface
+func (s *Storer) Count(ctx context.Context) (int, error) {
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf("SELECT COUNT(`hash`) FROM %s", s.gopherTable))
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	var count int
+	for rows.Next() {
+		if err := rows.Scan(&count); err != nil {
+			return 0, err
+		}
+		return count, nil
+	}
+
+	return 0, errors.New("no count response from database")
+}
+
+// Rating implements the storage.Interface
+func (s *Storer) Rating(ctx context.Context, hash model.Hash) (int, error) {
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf("SELECT AVG(`rating`) FROM %s WHERE hash = ?", s.ratingsTable), hash)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	var rating int
+	for rows.Next() {
+		if err := rows.Scan(&rating); err != nil {
+			return 0, err
+		}
+		return rating, nil
+	}
+
+	return 0, nil
 }
