@@ -22,6 +22,11 @@ type Storer struct {
 const createGophersQuery = "CREATE TABLE IF NOT EXISTS `%s` (`hash` BINARY(32) NOT NULL, `gopher` BLOB NOT NULL, PRIMARY KEY (`hash`));"
 const createRatingsQuery = "CREATE TABLE IF NOT EXISTS `%s` (`hash` BINARY(32) NOT NULL, `rating` TINYINT UNSIGNED NOT NULL, INDEX `ratings` (`hash`) );"
 
+// NewStorer creates a new Gopher storer using a given MySQL DSN
+func NewStorer(ctx context.Context, dsn string) (*Storer, error) {
+	return NewStorerWithCustomTables(ctx, dsn, "gophers", "ratings")
+}
+
 // NewStorerWithCustomTables creates a new Gopher storer using a given MySQL DSN
 func NewStorerWithCustomTables(ctx context.Context, dsn string, gopherTable, ratingsTable string) (*Storer, error) {
 	db, err := sql.Open("mysql", dsn)
@@ -135,4 +140,15 @@ func (s *Storer) Rating(ctx context.Context, hash model.Hash) (int, error) {
 	}
 
 	return 0, nil
+}
+
+// Rate implements the storage.Interface
+func (s *Storer) Rate(ctx context.Context, hash model.Hash, rating int) error {
+	if rating < 0 || rating > 5 {
+		return errors.New("invalid rating")
+	}
+	if _, err := s.db.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s VALUES (?, ?);", s.ratingsTable), hash, rating); err != nil {
+		return err
+	}
+	return nil
 }
