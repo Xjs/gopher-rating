@@ -39,4 +39,3 @@ go_repository(
     strip_prefix = "mux-1.6.2",
     urls = ["https://github.com/gorilla/mux/archive/v1.6.2.zip"],
 )
-
